@@ -1,5 +1,6 @@
 package com.restaurant_management_app.rma.service.product;
 
+import com.restaurant_management_app.rma.dto.ProductDTO;
 import com.restaurant_management_app.rma.model.Product;
 import com.restaurant_management_app.rma.request.AddProductRequest;
 import com.restaurant_management_app.rma.request.ProductUpdateRequest;
@@ -14,4 +15,6 @@ public interface IProductService {
     Product updateProduct(ProductUpdateRequest request, Long id);
     List<Product> getProductByName(String productName);
     List<Product> getProductByCategory(String category);
+
+    ProductDTO convertToDTO(Product theProduct);
 }
