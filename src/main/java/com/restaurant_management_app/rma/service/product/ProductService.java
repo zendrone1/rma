@@ -1,5 +1,6 @@
 package com.restaurant_management_app.rma.service.product;
 
+import com.restaurant_management_app.rma.dto.ProductDTO;
 import com.restaurant_management_app.rma.exceptions.ProductNotFoundException;
 import com.restaurant_management_app.rma.model.Category;
 import com.restaurant_management_app.rma.model.Product;
@@ -88,9 +89,22 @@ public class ProductService implements IProductService{
         return productRepository.findByName(productName);
     }
 
-    @Override
-    public List<Product> getProductByCategory(String category) {
+    public List<Product> getProductByCategory(String categoryName) {
+        Category category = categoryRepository.findByName(categoryName);
+        if (category != null) {
+            return productRepository.findByCategory(category);
+        }
+        return List.of(); // Retorna uma lista vazia se a categoria não for encontrada
+    }
 
-        return productRepository.findByCategory(category);
+
+    public ProductDTO convertToDTO(Product product) {
+        return ProductDTO.builder()
+                .id(product.getId())
+                .name(product.getName())
+                .price(product.getPrice())
+                .quantity(product.getQuantity())
+                .category(product.getCategory())
+                .build();
     }
 }
