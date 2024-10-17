@@ -6,105 +6,104 @@ import com.restaurant_management_app.rma.model.Category;
 import com.restaurant_management_app.rma.model.Product;
 import com.restaurant_management_app.rma.repository.CategoryRepository;
 import com.restaurant_management_app.rma.repository.ProductRepository;
-import com.restaurant_management_app.rma.request.AddProductRequest;
-import com.restaurant_management_app.rma.request.ProductUpdateRequest;
 import lombok.RequiredArgsConstructor;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
-public class ProductService implements IProductService{
-
-    @Autowired
+public class ProductService implements IProductService {
     private final ProductRepository productRepository;
     private final CategoryRepository categoryRepository;
 
     @Override
-    public List<Product> getAllProducts() {
-
-        return productRepository.findAll();
+    public List<ProductDTO> getAllProducts() {
+        return productRepository.findAll()
+                .stream()
+                .map(this::convertToDTO)
+                .collect(Collectors.toList());
     }
 
     @Override
-    public Product addProduct(AddProductRequest request) {
-        Category category = Optional.ofNullable(categoryRepository.findByName(request.getCategory().getName()))
-                .orElseGet(() -> {
-                    Category newCategory = new Category(request.getCategory().getName());
-                    return categoryRepository.save(newCategory);
-                });
-        request.setCategory(category);
-        return productRepository.save(createProduct(request,category));
-    }
+    public ProductDTO addProduct(ProductDTO productDTO) {
+        Category category;
 
-    private Product createProduct(AddProductRequest request,Category category) {
-        return new Product(
-                request.getName(),
-                request.getPrice(),
-                request.getQuantity(),
-                category
-        );
+        // Verifica se categoryId foi fornecido
+        if (productDTO.getCategoryId() != null) {
+            // Tenta encontrar a categoria pelo ID
+            Optional<Category> categoryOpt = categoryRepository.findById(productDTO.getCategoryId());
+            if (categoryOpt.isPresent()) {
+                category = categoryOpt.get();
+            } else {
+                throw new ProductNotFoundException("Category not found with the given ID.");
+            }
+        } else if (productDTO.getCategoryName() != null && !productDTO.getCategoryName().isEmpty()) {
+            // Verifica se a categoria já existe pelo nome
+            Optional<Category> existingCategoryOpt = categoryRepository.findByName(productDTO.getCategoryName());
+            if (existingCategoryOpt.isPresent()) {
+                // Usa a categoria existente
+                category = existingCategoryOpt.get();
+            } else {
+                // Cria uma nova categoria se não existir
+                category = new Category(productDTO.getCategoryName());
+                category = categoryRepository.save(category); // Salva a nova categoria no banco
+            }
+        } else {
+            throw new IllegalArgumentException("Either categoryId or categoryName must be provided.");
+        }
+
+        // Cria o produto com a categoria encontrada ou criada
+        Product product = new Product(productDTO.getName(), productDTO.getPrice(), productDTO.getQuantity(), category);
+        Product savedProduct = productRepository.save(product);
+
+        return convertToDTO(savedProduct);
     }
 
     @Override
-    public Product getProductById(Long id) {
+    public ProductDTO getProductById(Long id) {
         return productRepository.findById(id)
+                .map(this::convertToDTO)
                 .orElseThrow(() -> new ProductNotFoundException("Product not found"));
     }
 
     @Override
     public void deleteProductById(Long id) {
-        productRepository.findById(id)
-                .ifPresentOrElse(productRepository::delete,
-                        () -> {throw new ProductNotFoundException("Product Not found");});
-    }
-
-    @Override
-    public Product updateProduct(ProductUpdateRequest request, Long productId) {
-        return productRepository.findById(productId)
-                .map(existingProduct -> updateExistingProduct(existingProduct,request))
-                .map(productRepository :: save)
+        Product product = productRepository.findById(id)
                 .orElseThrow(() -> new ProductNotFoundException("Product not found"));
-    }
-
-    private Product updateExistingProduct(Product existingProduct, ProductUpdateRequest request) {
-        existingProduct.setName(request.getName());
-        existingProduct.setPrice(request.getPrice());
-        existingProduct.setQuantity(request.getQuantity());
-        Category category = categoryRepository.findByName(request.getCategory().getName());
-        existingProduct.setCategory(category);
-
-        return existingProduct;
-
-
-
-
+        productRepository.delete(product);
     }
 
     @Override
-    public List<Product> getProductByName(String productName) {
-        return productRepository.findByName(productName);
-    }
+    public ProductDTO updateProduct(Long id, ProductDTO productDTO) {
+        Product existingProduct = productRepository.findById(id)
+                .orElseThrow(() -> new ProductNotFoundException("Product not found"));
 
-    public List<Product> getProductByCategory(String categoryName) {
-        Category category = categoryRepository.findByName(categoryName);
-        if (category != null) {
-            return productRepository.findByCategory(category);
+        existingProduct.setName(productDTO.getName());
+        existingProduct.setPrice(productDTO.getPrice());
+        existingProduct.setQuantity(productDTO.getQuantity());
+
+        Optional<Category> categoryOpt = categoryRepository.findById(productDTO.getCategoryId());
+        if (categoryOpt.isPresent()) {
+            existingProduct.setCategory(categoryOpt.get());
+        } else {
+            throw new ProductNotFoundException("Category not found");
         }
-        return List.of(); // Retorna uma lista vazia se a categoria não for encontrada
+
+        Product updatedProduct = productRepository.save(existingProduct);
+        return convertToDTO(updatedProduct);
     }
 
-
-    public ProductDTO convertToDTO(Product product) {
+    private ProductDTO convertToDTO(Product product) {
         return ProductDTO.builder()
                 .id(product.getId())
                 .name(product.getName())
                 .price(product.getPrice())
                 .quantity(product.getQuantity())
-                .category(product.getCategory())
+                .categoryId(product.getCategory().getId())
+                .categoryName(product.getCategory().getName())// Adiciona o ID da categoria
                 .build();
     }
 }
