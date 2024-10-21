@@ -7,6 +7,7 @@ import com.restaurant_management_app.rma.model.Product;
 import com.restaurant_management_app.rma.repository.CategoryRepository;
 import com.restaurant_management_app.rma.repository.ProductRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -14,10 +15,12 @@ import java.util.Optional;
 import java.util.stream.Collectors;
 
 @Service
-@RequiredArgsConstructor
 public class ProductService implements IProductService {
-    private final ProductRepository productRepository;
-    private final CategoryRepository categoryRepository;
+    @Autowired
+    private ProductRepository productRepository;
+
+    @Autowired
+    private CategoryRepository categoryRepository;
 
     @Override
     public List<ProductDTO> getAllProducts() {
