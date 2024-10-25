@@ -15,6 +15,9 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.math.BigDecimal;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -32,6 +35,67 @@ class ProductServiceTest {
 
     @InjectMocks
     private ProductService productService;
+
+    @Nested
+    class getAll {
+
+        @Test
+        @DisplayName("Should return all products")
+        void shouldReturnAllProducts() {
+            //Arrange
+            Category category = new Category("Test Category");
+            category.setId(1L);
+
+        List<Product> products = Arrays.asList(
+                new Product("Test Product",new BigDecimal("10.6"),2,category),
+                new Product("Test Product 2",new BigDecimal("25.6"),10,category)
+        );
+
+        when(productRepository.findAll()).thenReturn(products);
+
+        //Act
+            List<ProductDTO> productDTOS = productService.getAllProducts();
+
+
+         //Assert
+         assertNotNull(productDTOS);
+         assertEquals(2,productDTOS.size());
+
+        // Verifying the first product
+        ProductDTO productDTO1 = productDTOS.get(0);
+        assertEquals("Test Product", productDTO1.getName());
+        assertEquals(new BigDecimal("10.6"), productDTO1.getPrice());
+        assertEquals(2, productDTO1.getQuantity());
+        assertEquals(1L, productDTO1.getCategoryId());
+
+        // Verifying the second product
+        ProductDTO productDTO2 = productDTOS.get(1);
+        assertEquals("Test Product 2", productDTO2.getName());
+        assertEquals(new BigDecimal("25.6"), productDTO2.getPrice());
+        assertEquals(10, productDTO2.getQuantity());
+        assertEquals(1L, productDTO2.getCategoryId());
+
+        // Verifying that the findAll method was called once
+        verify(productRepository, times(1)).findAll();
+        }
+
+        @Test
+        @DisplayName("Should return an empty list when there are no products")
+        void shouldReturnEmptyListWhenNoProducts() {
+            // Arrange: Simula que o repositório retorna uma lista vazia
+            when(productRepository.findAll()).thenReturn(Collections.emptyList());
+
+            // Act
+            List<ProductDTO> products = productService.getAllProducts();
+
+            // Assert
+            assertNotNull(products);
+            assertTrue(products.isEmpty());
+
+            // Verifica que o método findAll foi chamado uma vez
+            verify(productRepository, times(1)).findAll();
+        }
+    }
 
     @Nested
     class GetProductById {
@@ -171,10 +235,49 @@ class ProductServiceTest {
                     .build();
 
             // Act & Assert
-            Exception exception = assertThrows(ProductNotFoundException.class, () -> productService.addProduct(productDTO)); // Atualizando para a exceção correta
+            Exception exception = assertThrows(ProductNotFoundException.class, () -> productService.addProduct(productDTO));
             assertEquals("Category not found with the given ID.", exception.getMessage());
 
             verify(productRepository, never()).save(any(Product.class));
+        }
+    }
+
+    @Nested
+    class DeleteProductById {
+        @Test
+        @DisplayName("Should delete product when product exists")
+        void shouldDeleteProductWhenExist() {
+            //Arrange
+            Long productId = 1L;
+            Product product = new Product();
+            product.setId(productId);
+
+            when(productRepository.findById(productId)).thenReturn(Optional.of(product));
+
+            //Act
+            productService.deleteProductById(productId);
+
+            //Assert
+            verify(productRepository, times(1)).delete(product);
+            verify(productRepository, times(1)).findById(productId);
+        }
+
+        @Test
+        @DisplayName("Should throw exception when product does not exist")
+        void shouldThrowExceptionWhenProductDoesNotExist() {
+            // Arrange
+            Long productId = 1L;
+            when(productRepository.findById(productId)).thenReturn(Optional.empty());
+
+            // Act & Assert
+            ProductNotFoundException exception = assertThrows(
+                    ProductNotFoundException.class,
+                    () -> productService.deleteProductById(productId)
+            );
+            assertEquals("Product not found", exception.getMessage());
+
+            verify(productRepository, times(1)).findById(productId);
+            verify(productRepository, never()).delete(any());
         }
     }
 }
